@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 0.1 Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && (request.auth.token.email_verified == true);
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- USERS ---
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && 
+                   request.resource.data.keys().hasAll(['role', 'name']) &&
+                   request.resource.data.role in ['DRIVER', 'MERCHANT', 'NONE'] &&
+                   request.resource.data.name is string;
+    }
+
+    // --- CARGO COLLECTION GROUP ---
+    // Specifically allow global list/get queries across all 'cargo' subcollections
+    match /{path=**}/cargo/{itemId} {
+      allow read: if isSignedIn();
+    }
+
+    // --- DRIVERS ---
+    match /drivers/{driverId} {
+      // Allow reading individual drivers if signed in
+      allow get: if isSignedIn();
+      // Allow listing drivers for the merchant dashboard
+      allow list: if isSignedIn();
+      
+      // Creating a driver profile: must correspond to UID.
+      allow create: if isOwner(driverId) && 
+                    isValidDriver(request.resource.data) &&
+                    request.resource.data.keys().size() >= 6; // Basic protection
+      
+      // Updates: only the owner can update their status/location.
+      allow update: if isOwner(driverId) && isValidDriver(request.resource.data) && (
+        // Action: Update Location
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['latitude', 'longitude', 'heading', 'lastUpdate'])) ||
+        // Action: Update Status
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'lastUpdate'])) ||
+        // Action: Proof of Delivery
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['proofOfDelivery', 'signature', 'status', 'lastUpdate'])) ||
+        // Action: Toggle Online
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'lastUpdate']))
+      );
+
+      // --- CARGO ---
+      match /cargo/{itemId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(driverId) && isValidCargo(request.resource.data);
+      }
+    }
+
+    // --- VALIDATION HELPERS ---
+    function isValidDriver(data) {
+      // Map.keys() returns a List, we check it has all required ones. 
+      // strict key check handled by update logic (diff) and create logic (size check)
+      return data.keys().hasAll(['name', 'isOnline', 'latitude', 'longitude', 'status', 'lastUpdate']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.isOnline is bool &&
+             data.latitude is number && data.latitude >= -90 && data.latitude <= 90 &&
+             data.longitude is number && data.longitude >= -180 && data.longitude <= 180 &&
+             data.status in ['IN_TRANSIT', 'DELIVERED', 'DELAYED'] &&
+             data.lastUpdate is number &&
+             // Optional fields
+             (!('heading' in data) || (data.heading is number && data.heading >= 0 && data.heading <= 360)) &&
+             (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 500)) &&
+             (!('proofOfDelivery' in data) || (data.proofOfDelivery is string && data.proofOfDelivery.size() <= 1000)) &&
+             (!('signature' in data) || (data.signature is string && data.signature.size() <= 1000));
+    }
+
+    function isValidCargo(data) {
+      return data.keys().hasAll(['name', 'quantity', 'destination', 'merchantId']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.quantity is number && data.quantity >= 0 &&
+             data.destination is string && data.destination.size() <= 200 &&
+             data.merchantId is string && data.merchantId.size() <= 128;
+    }
+  }
+}

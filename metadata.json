@@ -1,0 +1,8 @@
+{
+  "name": "Island Sync",
+  "description": "A real-time logistics tracking platform for merchants and drivers.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "entities": {
+    "Driver": {
+      "title": "Driver",
+      "description": "Information about a delivery driver, their current location, and status.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Display name of the driver" },
+        "avatar": { "type": "string", "description": "URL to the driver's avatar image" },
+        "isOnline": { "type": "boolean", "description": "Whether the driver is currently active" },
+        "latitude": { "type": "number", "description": "Current latitude coordinate" },
+        "longitude": { "type": "number", "description": "Current longitude coordinate" },
+        "heading": { "type": "number", "description": "Direction the driver is heading in degrees" },
+        "status": { 
+          "type": "string", 
+          "enum": ["IN_TRANSIT", "DELIVERED", "DELAYED"],
+          "description": "Current status of the driver's delivery work" 
+        },
+        "lastUpdate": { "type": "number", "description": "Unix timestamp of the last update" },
+        "proofOfDelivery": { "type": "string", "description": "URL to recorded proof of delivery image" },
+        "signature": { "type": "string", "description": "Base64 or text representation of merchant signature" }
+      },
+      "required": ["name", "isOnline", "latitude", "longitude", "status", "lastUpdate"]
+    },
+    "CargoItem": {
+      "title": "Cargo Item",
+      "description": "An item being delivered within a driver's cargo manifest.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the item" },
+        "quantity": { "type": "number", "description": "Number of items" },
+        "destination": { "type": "string", "description": "Destination address or name" },
+        "merchantId": { "type": "string", "description": "ID of the associated merchant" }
+      },
+      "required": ["name", "quantity", "destination", "merchantId"]
+    }
+  },
+  "firestore": {
+    "/drivers/{driverId}": {
+      "schema": "Driver",
+      "description": "Collection of all drivers."
+    },
+    "/drivers/{driverId}/cargo/{itemId}": {
+      "schema": "CargoItem",
+      "description": "The current cargo manifest for a specific driver."
+    }
+  }
+}
