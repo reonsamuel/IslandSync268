@@ -6,7 +6,7 @@ import { CargoItem, DeliveryStatus, UserRole } from '../types';
 import { MERCHANTS } from '../services/mockData';
 
 export const DriverApp: React.FC = () => {
-  const { user, drivers, toggleStatus, updateLocation, updateCargo, updateDeliveryStatus, logout, setRole } = useLogistics();
+  const { user, drivers, toggleStatus, updateLocation, updateCargo, updateDeliveryStatus, logout, setRole, deliverItem } = useLogistics();
   const currentDriver = drivers.find(d => d.id === user?.id);
   const isOnline = currentDriver?.isOnline || false;
   
@@ -16,13 +16,15 @@ export const DriverApp: React.FC = () => {
   const [merchantId, setMerchantId] = useState('');
   
   // Confirmation State
-  const [pendingStatus, setPendingStatus] = useState<DeliveryStatus | null>(null);
   const [pendingItem, setPendingItem] = useState<CargoItem | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [signatureName, setSignatureName] = useState('');
 
+  const [showMap, setShowMap] = useState(true);
+
   // Derived State
-  const taskCount = currentDriver?.cargo?.length || 0;
+  const activeCargo = currentDriver?.cargo?.filter(c => c.status !== 'DELIVERED') || [];
+  const taskCount = activeCargo.length;
 
   // Geolocation Loop
   useEffect(() => {
@@ -86,14 +88,19 @@ export const DriverApp: React.FC = () => {
     }
   };
 
-  const handleDeliverItem = (proof?: string, signature?: string) => {
+  const handleDeliverItem = async (proof?: string, signature?: string) => {
     if (!pendingItem) return;
-    // Remove the item from the manifest
-    removeCargo(pendingItem.id);
-    // Reset state
-    setPendingItem(null);
-    setPhotoPreview(null);
-    setSignatureName('');
+    try {
+      // Mark as delivered in database
+      await deliverItem(pendingItem.id, proof, signature);
+      // Reset state
+      setPendingItem(null);
+      setPhotoPreview(null);
+      setSignatureName('');
+    } catch (error) {
+      console.error("Failed to deliver item:", error);
+      alert("Failed to confirm delivery. Please try again.");
+    }
   };
 
   const statusConfig: Record<DeliveryStatus, { activeClass: string, inactiveClass: string, icon: React.ReactNode, label: string }> = {
@@ -199,13 +206,7 @@ export const DriverApp: React.FC = () => {
                   <button
                     key={status}
                     onClick={() => {
-                      if (status === 'DELIVERED') {
-                        setPendingStatus('DELIVERED');
-                        setPhotoPreview(null);
-                        setSignatureName('');
-                      } else {
-                        updateDeliveryStatus(status);
-                      }
+                      updateDeliveryStatus(status);
                     }}
                     className={`py-3 px-2 rounded-xl text-xs font-bold border transition-all flex flex-col items-center justify-center shadow-lg ${
                       isActive 
@@ -224,15 +225,29 @@ export const DriverApp: React.FC = () => {
 
         {/* Live Map Tracking */}
         {isOnline && (
-          <section className="h-64 w-full rounded-xl overflow-hidden border border-slate-700 shadow-lg relative bg-slate-800">
-             <Map 
-               drivers={drivers} 
-               selectedDriverId={user?.id || null} 
-               onSelectDriver={() => {}} 
-             />
-             <div className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur px-2 py-1 rounded text-[10px] text-slate-400 border border-slate-700 pointer-events-none">
-               Live Tracking
-             </div>
+          <section className="space-y-2">
+            <div className="flex justify-between items-center px-1">
+              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Live Map</h2>
+              <button 
+                onClick={() => setShowMap(!showMap)}
+                className="text-[10px] text-blue-400 hover:text-blue-300 font-bold uppercase"
+              >
+                {showMap ? 'Hide Map' : 'Show Map'}
+              </button>
+            </div>
+            
+            {showMap && (
+              <div className="h-64 w-full rounded-xl overflow-hidden border border-slate-700 shadow-lg relative bg-slate-800 animate-in fade-in slide-in-from-top-2 duration-300">
+                 <Map 
+                   drivers={drivers} 
+                   selectedDriverId={user?.id || null} 
+                   onSelectDriver={() => {}} 
+                 />
+                 <div className="absolute bottom-2 right-2 bg-slate-900/80 backdrop-blur px-2 py-1 rounded text-[10px] text-slate-400 border border-slate-700 pointer-events-none">
+                   Live Tracking
+                 </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -281,10 +296,10 @@ export const DriverApp: React.FC = () => {
           )}
 
           <div className="space-y-2 mt-4">
-            {currentDriver?.cargo?.length === 0 && (
-              <p className="text-center text-slate-600 text-sm py-4">No cargo logged.</p>
+            {activeCargo.length === 0 && (
+              <p className="text-center text-slate-600 text-sm py-4">No active cargo logged.</p>
             )}
-            {currentDriver?.cargo?.map(item => (
+            {activeCargo.map(item => (
               <div key={item.id} className="group relative bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg hover:border-slate-600 transition-all">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -346,8 +361,8 @@ export const DriverApp: React.FC = () => {
         </div>
       </div>
 
-      {/* Confirmation Modal (Shared for Global Status & Item Delivery) */}
-      {(pendingStatus === 'DELIVERED' || pendingItem) && (
+      {/* Confirmation Modal (For Item Delivery) */}
+      {pendingItem && (
         <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="w-full max-w-sm space-y-6 text-center">
             <div className="mx-auto h-16 w-16 bg-emerald-500/20 rounded-full flex items-center justify-center mb-4">
@@ -357,12 +372,10 @@ export const DriverApp: React.FC = () => {
             </div>
             
             <h2 className="text-2xl font-bold text-white">
-              {pendingItem ? 'Confirm Item Delivery' : 'Confirm Trip Completion'}
+              Confirm Item Delivery
             </h2>
             <p className="text-slate-400 text-sm">
-              {pendingItem 
-                ? `Verifying delivery for: ${pendingItem.name}` 
-                : 'Please verify the trip is complete. You may optionally attach a proof of delivery photo.'}
+              Verifying delivery for: {pendingItem.name}
             </p>
 
             {/* Photo Capture Area */}
@@ -424,7 +437,6 @@ export const DriverApp: React.FC = () => {
             <div className="grid grid-cols-2 gap-3 pt-4">
               <button 
                 onClick={() => {
-                  setPendingStatus(null);
                   setPendingItem(null);
                   setPhotoPreview(null);
                   setSignatureName('');
@@ -435,13 +447,10 @@ export const DriverApp: React.FC = () => {
               </button>
               <button 
                 disabled={!signatureName}
-                onClick={() => {
+                onClick={async () => {
                   if (pendingItem) {
-                    handleDeliverItem(photoPreview || undefined, signatureName);
-                  } else {
-                    updateDeliveryStatus('DELIVERED', photoPreview || undefined, signatureName);
+                    await handleDeliverItem(photoPreview || undefined, signatureName);
                   }
-                  setPendingStatus(null);
                   setPendingItem(null);
                   setPhotoPreview(null);
                   setSignatureName('');

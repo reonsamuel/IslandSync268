@@ -92,7 +92,11 @@ service cloud.firestore {
              data.name is string && data.name.size() <= 100 &&
              data.quantity is number && data.quantity >= 0 &&
              data.destination is string && data.destination.size() <= 200 &&
-             data.merchantId is string && data.merchantId.size() <= 128;
+             data.merchantId is string && data.merchantId.size() <= 128 &&
+             (!('status' in data) || (data.status in ['PENDING', 'DELIVERED'])) &&
+             (!('deliveredAt' in data) || (data.deliveredAt is number)) &&
+             (!('proofOfDelivery' in data) || (data.proofOfDelivery is string)) &&
+             (!('signature' in data) || (data.signature is string));
     }
   }
 }

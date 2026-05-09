@@ -12,6 +12,9 @@ export interface CargoItem {
   quantity: number;
   destination: string;
   merchantId: string;
+  status?: 'PENDING' | 'DELIVERED';
+  proofOfDelivery?: string;
+  signature?: string;
 }
 
 export interface Driver {

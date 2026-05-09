@@ -9,7 +9,7 @@ export const MerchantDashboard: React.FC = () => {
 
   const selectedDriver = drivers.find(d => d.id === selectedDriverId);
   const activeDrivers = drivers.filter(d => d.isOnline).length;
-  const totalCargo = drivers.reduce((acc, d) => acc + (d.cargo?.reduce((sum, c) => sum + c.quantity, 0) || 0), 0);
+  const totalCargo = drivers.reduce((acc, d) => acc + (d.cargo?.filter(c => c.status !== 'DELIVERED').reduce((sum, c) => sum + c.quantity, 0) || 0), 0);
 
   const getStatusIcon = (status: DeliveryStatus) => {
     switch (status) {
@@ -107,15 +107,15 @@ export const MerchantDashboard: React.FC = () => {
                       {driver.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center mt-1">
-                     <div className="flex items-center gap-1">
-                       {getStatusIcon(driver.status)}
-                       <span className="text-xs text-slate-500">
-                          {driver.latitude.toFixed(4)}, {driver.longitude.toFixed(4)}
-                       </span>
-                     </div>
-                     <span className="text-xs text-slate-500">{driver.cargo.length} items</span>
-                  </div>
+                      <div className="flex justify-between items-center mt-1">
+                         <div className="flex items-center gap-1">
+                           {getStatusIcon(driver.status)}
+                           <span className="text-xs text-slate-500">
+                              {driver.latitude.toFixed(4)}, {driver.longitude.toFixed(4)}
+                           </span>
+                         </div>
+                         <span className="text-xs text-slate-500">{driver.cargo.filter(c => c.status !== 'DELIVERED').length} active</span>
+                      </div>
                 </div>
               </button>
             ))}
@@ -176,16 +176,30 @@ export const MerchantDashboard: React.FC = () => {
                   <p className="text-sm text-slate-600 text-center py-4">Vehicle Empty</p>
                 ) : (
                   selectedDriver.cargo.map(item => (
-                    <div key={item.id} className="bg-slate-950 p-3 rounded border border-slate-800 text-sm">
+                    <div key={item.id} className={`p-3 rounded border text-sm transition-all ${
+                      item.status === 'DELIVERED' ? 'bg-emerald-500/5 border-emerald-500/20 opacity-80' : 'bg-slate-950 border-slate-800'
+                    }`}>
                       <div className="flex justify-between mb-1">
-                        <span className="font-medium text-slate-300">{item.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium ${item.status === 'DELIVERED' ? 'text-emerald-400 line-through' : 'text-slate-300'}`}>
+                            {item.name}
+                          </span>
+                          {item.status === 'DELIVERED' && (
+                            <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1 py-0.5 rounded uppercase font-bold">Done</span>
+                          )}
+                        </div>
                         <span className="text-blue-400 font-mono">x{item.quantity}</span>
                       </div>
-                      <div className="text-xs text-slate-500 flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        </svg>
-                        {item.destination}
+                      <div className="text-xs text-slate-500 flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          </svg>
+                          {item.destination}
+                        </div>
+                        {item.signature && (
+                          <span className="text-[10px] text-emerald-500/70 italic font-medium">Signed: {item.signature}</span>
+                        )}
                       </div>
                     </div>
                   ))
