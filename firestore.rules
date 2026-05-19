@@ -12,7 +12,13 @@ service cloud.firestore {
     }
 
     function isVerified() {
-      return isSignedIn() && (request.auth.token.email_verified == true);
+      return isSignedIn(); // Relaxed for development to allow unverified emails (like reon@islandsync.app)
+    }
+
+    function isMerchant() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'NONE') == 'MERCHANT';
     }
 
     function isOwner(userId) {
@@ -25,11 +31,23 @@ service cloud.firestore {
 
     // --- USERS ---
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isSignedIn(); // Allow all signed-in users to read profiles (needed for names/avatars)
       allow write: if isOwner(userId) && 
                    request.resource.data.keys().hasAll(['role', 'name']) &&
                    request.resource.data.role in ['DRIVER', 'MERCHANT', 'NONE'] &&
                    request.resource.data.name is string;
+    }
+
+    // --- CONVERSATIONS ---
+    match /conversations/{chatId} {
+      allow read: if isSignedIn() && (isOwner(chatId) || isMerchant());
+      allow write: if isSignedIn() && (isOwner(chatId) || isMerchant());
+    }
+
+    // --- MERCHANTS ---
+    match /merchants/{merchantId} {
+      allow read: if isSignedIn();
+      allow write: if isMerchant();
     }
 
     // --- CARGO COLLECTION GROUP ---
@@ -50,26 +68,43 @@ service cloud.firestore {
                     isValidDriver(request.resource.data) &&
                     request.resource.data.keys().size() >= 6; // Basic protection
       
-      // Updates: only the owner can update their status/location.
-      allow update: if isOwner(driverId) && isValidDriver(request.resource.data) && (
+      // Updates: owner can update their status/location, Merchant can manage fleet.
+      allow update: if (isOwner(driverId) || isMerchant()) && isValidDriver(request.resource.data) && (
         // Action: Update Location
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['latitude', 'longitude', 'heading', 'lastUpdate'])) ||
-        // Action: Update Status
+        // Action: Update Status (Driver or Merchant)
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'lastUpdate'])) ||
         // Action: Proof of Delivery
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['proofOfDelivery', 'signature', 'status', 'lastUpdate'])) ||
-        // Action: Toggle Online
+        // Action: Toggle Online (Driver or Merchant)
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isOnline', 'lastUpdate']))
       );
 
       // --- CARGO ---
       match /cargo/{itemId} {
         allow read: if isSignedIn();
-        allow write: if isOwner(driverId) && isValidCargo(request.resource.data);
+        allow create, update: if isOwner(driverId) && isValidCargo(request.resource.data);
+        allow delete: if isOwner(driverId);
       }
     }
 
+    // --- MESSAGES ---
+    match /chats/{driverId}/messages/{messageId} {
+      allow read: if isSignedIn() && (isOwner(driverId) || isMerchant());
+      allow create: if isSignedIn() && (isOwner(driverId) || isMerchant()) && isValidMessage(request.resource.data, driverId);
+    }
+
     // --- VALIDATION HELPERS ---
+    function isValidMessage(data, chatId) {
+      return data.keys().hasAll(['chatId', 'senderId', 'senderName', 'text', 'timestamp', 'role']) &&
+             data.chatId == chatId &&
+             data.senderId == request.auth.uid &&
+             data.senderName is string && data.senderName.size() > 0 &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 1000 &&
+             data.timestamp is number &&
+             data.role in ['DRIVER', 'MERCHANT'];
+    }
+
     function isValidDriver(data) {
       // Map.keys() returns a List, we check it has all required ones. 
       // strict key check handled by update logic (diff) and create logic (size check)

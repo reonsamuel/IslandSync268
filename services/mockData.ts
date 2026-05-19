@@ -1,10 +1,11 @@
-import { Driver } from '../types';
+import { Driver, Merchant } from '../types';
 
-export const MERCHANTS = [
-  { id: 'm1', name: 'Island Provisions' },
-  { id: 'm2', name: 'Caribbean Seafoods' },
-  { id: 'm3', name: 'Antigua Marine Supply' },
-  { id: 'm4', name: 'Tropical Logistics' }
+export const MERCHANTS: Merchant[] = [
+  { id: 'm1', name: 'Island Provision', sector: 'Food & Beverage', latitude: 17.12402167914038, longitude: -61.812929354660895 },
+  { id: 'm4', name: 'DEWS Pro Builders', sector: 'Construction & Lumber', latitude: 17.11977276128947, longitude: -61.815688845690275 },
+  { id: 'm5', name: 'Louis Hardware Depot', sector: 'Industrial & Hardware', latitude: 17.12524170187093, longitude: -61.82363831422302 },
+  { id: 'm6', name: 'Antigua Plumbing & Hardware', sector: 'Industrial Fittings', latitude: 17.11414794724959, longitude: -61.83886091635262 },
+  { id: 'm7', name: 'Unicomer Group Distribution Centre', sector: 'Distribution & Logistics', latitude: 17.1289946, longitude: -61.8113272 }
 ];
 
 export const INITIAL_DRIVERS: Driver[] = [

@@ -33,9 +33,39 @@
         "merchantId": { "type": "string", "description": "ID of the associated merchant" }
       },
       "required": ["name", "quantity", "destination", "merchantId"]
+    },
+    "Merchant": {
+      "title": "Merchant",
+      "description": "A merchant or business in the logistics network.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the merchant" },
+        "sector": { "type": "string", "description": "Business sector (e.g., Food, Construction)" },
+        "latitude": { "type": "number", "description": "Latitude of the merchant facility" },
+        "longitude": { "type": "number", "description": "Longitude of the merchant facility" }
+      },
+      "required": ["name", "sector", "latitude", "longitude"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "A real-time message between drivers and dispatchers.",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string", "description": "The ID of the chat (Driver ID)" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "role": { "type": "string" }
+      },
+      "required": ["chatId", "senderId", "senderName", "text", "timestamp", "role"]
     }
   },
   "firestore": {
+    "/merchants/{merchantId}": {
+      "schema": "Merchant",
+      "description": "Collection of all merchants."
+    },
     "/drivers/{driverId}": {
       "schema": "Driver",
       "description": "Collection of all drivers."
@@ -43,6 +73,10 @@
     "/drivers/{driverId}/cargo/{itemId}": {
       "schema": "CargoItem",
       "description": "The current cargo manifest for a specific driver."
+    },
+    "/chats/{driverId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Private chat between a driver and the dispatchers."
     }
   }
 }

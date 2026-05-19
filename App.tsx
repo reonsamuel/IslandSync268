@@ -3,6 +3,7 @@ import { LogisticsProvider, useLogistics } from './services/logisticsContext';
 import { Auth } from './components/Auth';
 import { DriverApp } from './components/DriverApp';
 import { MerchantDashboard } from './components/MerchantDashboard';
+import { DispatchChat } from './components/DispatchChat';
 import { UserRole } from './types';
 
 const AppContent: React.FC = () => {
@@ -20,7 +21,12 @@ const AppContent: React.FC = () => {
     return <Auth />;
   }
 
-  return user.role === UserRole.DRIVER ? <DriverApp /> : <MerchantDashboard />;
+  return (
+    <>
+      {user.role === UserRole.DRIVER ? <DriverApp /> : <MerchantDashboard />}
+      {user.role === UserRole.MERCHANT && <DispatchChat />}
+    </>
+  );
 };
 
 const App: React.FC = () => {

@@ -32,8 +32,38 @@ export interface Driver {
   signature?: string;
 }
 
+export interface Merchant {
+  id: string;
+  name: string;
+  sector: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface User {
   id: string;
   role: UserRole;
   name: string;
+  avatar?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  text: string;
+  timestamp: number;
+  role: UserRole;
+}
+
+export interface Conversation {
+  chatId: string;
+  lastMessage: string;
+  lastTimestamp: number;
+  lastSenderName: string;
+  lastSenderId: string;
+  unreadMerchant?: boolean;
+  unreadDriver?: boolean;
 }
